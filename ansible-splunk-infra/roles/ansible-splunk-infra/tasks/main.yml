@@ -1,0 +1,90 @@
+---
+# tasks file for ansible-splunk-infra
+- name: install ubuntu 16.04 collectd repo key
+  apt_key:
+    url: http://pkg.ci.collectd.org/pubkey.asc
+    state: present
+  when: ansible_distribution == 'Ubuntu' and ansible_distribution_release == 'xenial'
+
+- name: add collectd repo ubuntu 16.04
+  apt_repository:
+    repo: deb http://pkg.ci.collectd.org/deb xenial collectd-5.8
+    state: present
+  when: ansible_distribution == 'Ubuntu' and ansible_distribution_release == 'xenial'
+
+
+
+
+
+- name: install debian deps
+  apt:
+    name: ['libcurl3', 'collectd', 'collectd-core']
+    update_cache: true
+    state: latest
+  when: ansible_facts['os_family'] == "Debian"
+
+- name: Ensure the EPEL repository is available
+  yum:
+    name: https://archive.fedoraproject.org/pub/epel/7/x86_64/Packages/e/epel-release-7-11.noarch.rpm
+    state: installed
+  when: ansible_distribution == 'CentOS'
+
+- name: install redhat deps
+  yum:
+    name: ['libgcrypt', 'libselinux-python', 'libudev-devel', 'libcurl-devel', 'yajl-devel', 'collectd']
+    state: present
+    enablerepo: "epel"
+    update_cache: yes
+  when: ansible_facts['os_family'] == "RedHat"
+
+- name: install collectd-disk for fedora
+  yum:
+    name: ['collectd-disk']
+    state: present
+    enablerepo: "epel"
+    update_cache: yes
+  when: ansible_distribution == 'Fedora' 
+
+- name: make /etc/collectd dir
+  file:
+    path: /etc/collectd
+    state: directory
+
+- name: template collectd conf Debain
+  template:
+    src: collectd.conf.j2
+    dest: /etc/collectd/collectd.conf
+  when: ansible_facts['os_family'] == "Debian"
+
+
+- name: template collectd conf Redhat
+  template:
+    src: collectd.conf.j2
+    dest: /etc/collectd.conf
+  when: ansible_facts['os_family'] == "RedHat"
+
+- name: add splunk addon Debain
+  copy:
+    src: write_splunk.so
+    dest: /usr/lib/collectd
+    mode: 0644
+  when: ansible_facts['os_family'] == "Debian"
+
+- name: add splunk addon Redhat
+  copy:
+    src: write_splunk.so
+    dest: /usr/lib64/collectd
+    mode: 0644
+  when: ansible_facts['os_family'] == "RedHat"
+
+- name: switch selinux to permissive
+  selinux:
+    policy: targeted
+    state: permissive
+  when: ansible_facts['os_family'] == "RedHat"
+
+- name: systemd start/enable collectd
+  systemd:
+    state: restarted
+    enabled: yes
+    name: collectd

@@ -1,0 +1,6 @@
+---
+# defaults file for ansible-splunk-infra
+splunkaddr: <Splunk_url>
+splunkport: 9997
+hecport: 8088
+hectoken: <HEC_token>
